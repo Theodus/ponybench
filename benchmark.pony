@@ -2,7 +2,7 @@ trait BenchmarkList
   """
   Source of benchmarks for a PonyBench object.
   """
-  fun benchmarks(bench: PonyBench)
+  fun tag benchmarks(bench: PonyBench)
   """
   Add all the benchmarks to the given bench object.
   Typically the implementation of this function will be of the form:

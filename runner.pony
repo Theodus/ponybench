@@ -8,6 +8,7 @@ class BenchmarkRunner
   managing the timer and discarding results.
   """
   let _env: Env
+  var _discard_time: U64
   var _bench_time: U64
   var _n: USize = 1
   var _start_time: U64 = 0
@@ -19,6 +20,19 @@ class BenchmarkRunner
   new _create(env: Env, benchtime: U64 = 1_000_000_000) =>
     _env = env
     _bench_time = benchtime
+    _discard_time = 0
+    _n = 1_000_000
+    try
+      _run(object ref is Benchmark
+        fun name(): String => ""
+        fun apply(b: BenchmarkRunner) =>
+          for i in Range[USize](0, b.n()) do
+            b.discard(None)
+          end
+      end)
+    end
+    _discard_time = _ns_per_op()
+    _reset()
 
   fun ref apply(bench: Benchmark) ? =>
     """
@@ -85,6 +99,7 @@ class BenchmarkRunner
     end
 
   fun ref _run(bench: Benchmark) ? =>
+    @pony_triggergc[None](this)
     reset_timer()
     start_timer()
     bench(this)
@@ -155,6 +170,6 @@ class BenchmarkRunner
     list.push("\t")
     list.push(_n.string(fmt))
     list.push("\t")
-    list.push(_ns_per_op().string(fmt))
+    list.push((_ns_per_op() - _discard_time).string(fmt))
     list.push(" ns/op\n")
     _env.out.writev(consume list)
