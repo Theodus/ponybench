@@ -1,6 +1,5 @@
 use "time"
 use "collections"
-use "debug"
 
 class BenchmarkRunner
   """
@@ -22,17 +21,7 @@ class BenchmarkRunner
     _bench_time = benchtime
     _discard_time = 0
     _n = 1_000_000
-    try
-      _run(object ref is Benchmark
-        fun name(): String => ""
-        fun apply(b: BenchmarkRunner) =>
-          for i in Range[USize](0, b.n()) do
-            b.discard(None)
-          end
-      end)
-    end
     _discard_time = _ns_per_op()
-    _reset()
 
   fun ref apply(bench: Benchmark) ? =>
     """
@@ -41,7 +30,7 @@ class BenchmarkRunner
     _reset()
     _run(bench)
     while (_duration < _bench_time) and (_n < 1_000_000_000) do
-      let nspo = _ns_per_op()
+      let nspo = _ns_per_op().u64()
       _n = if nspo == 0 then
         1_000_000_000
       else
@@ -90,20 +79,13 @@ class BenchmarkRunner
     """
     _n
 
-  fun discard(v: Stringable) =>
-    """
-    Avoid loop optimization by calling this function in the benchmark loop.
-    """
-    if not Platform.debug() then
-      Debug.out(v.string())
-    end
-
   fun ref _run(bench: Benchmark) ? =>
     @pony_triggergc[None](this)
     reset_timer()
     start_timer()
     bench(this)
     stop_timer()
+
     _prev_n = _n
     _prev_duration = _duration
 
