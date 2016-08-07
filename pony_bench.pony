@@ -1,35 +1,61 @@
 use "collections"
-use "time"
+use "promises"
 use "term"
 
 actor PonyBench
+  embed _bs: Array[(String, {()} val, String)]
   let _env: Env
 
   new create(env: Env) =>
-    _env = env
+    (_bs, _env) = (Array[(String, {()} val, String)], env)
 
   be apply[A: Any #share](name: String, f: {(): A ?} val, ops: U64 = 0) =>
-    """
-    Benchmark the given function by calling it repeatedly and calculating an
-    average execution time.
-    """
-    try
-      (let ops', let nspo) = if ops == 0 then
-        _AutoBench[A](f)
-      else
-        @pony_triggergc[None](this)
-        let start = Time.nanos()
-        for i in Range[U64](0, ops) do
-          DoNotOptimise[A](f())
+    let bf = recover val
+      if ops == 0 then
+        lambda()(notify = this, name, f) =>
+          _AutoBench[A](notify, name, f)()
         end
-        let stop = Time.nanos()
-        (ops, (stop - start) / ops)
+      else
+        lambda()(notify = this, name, f, ops) =>
+          _Bench[A](notify)(name, f, ops)
+        end
       end
-
-      let fmt = FormatSettingsInt.set_width(10)
-      let sl = [name, "\t", ops'.string(fmt), "\t", nspo.string(fmt), " ns/op"]
-      _env.out.print(String.join(sl))
-    else
-      let sl = [ANSI.red(), "**** FAILED Benchmark: ", name, ANSI.reset()]
-      _env.out.print(String.join(sl))
     end
+    _bs.push((name, bf, ""))
+    if _bs.size() < 2 then bf() end
+
+  // TODO async
+
+  be _result(name: String, ops: U64, nspo: U64) =>
+    let fmt = FormatSettingsInt.set_width(10)
+    let sl = [name, "\t", ops.string(fmt), "\t", nspo.string(fmt), " ns/op"]
+    _update(name, String.join(sl))
+    _next()
+
+  be _failure(name: String) =>
+    let sl = [ANSI.red(), "**** FAILED Benchmark: ", name, ANSI.reset()]
+    _update(name, String.join(sl))
+    _next()
+
+  fun ref _update(name: String, result: String) =>
+    try
+      for (i, (n, f, s)) in _bs.pairs() do
+        if n == name then
+          _bs(i) = (n, f, result)
+        end
+      end
+    end
+
+  fun ref _next() =>
+    try
+      while _bs(0)._3 != "" do
+        _env.out.print(_bs.shift()._3)
+      end
+      if _bs.size() > 0 then
+        _bs(0)._2()
+      end
+    end
+
+interface tag _BenchNotify
+  be _result(name: String, ops: U64, nspo: U64)
+  be _failure(name: String)

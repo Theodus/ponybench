@@ -1,66 +1,57 @@
 use "collections"
-use "time"
+use "promises"
 
-class _AutoBench[A: Any #share]
-  var _bench_time: U64 = 1_000_000_000
-  var _n: U64 = 1
-  var _start_time: U64 = 0
-  var _duration: U64 = 0
-  var _timing: Bool = false
-  var _prev_n: U64 = 0
-  var _prev_duration: U64 = 0
-  let _max_ops: U64 = 1_000_000_000
+actor _AutoBench[A: Any #share]
+  let _notify: _BenchNotify
+  let _run: {(U64)} val
+  let _auto_ops: _AutoOps
 
-  fun ref apply(f: {(): A ?} val): (U64, U64) ? =>
-    _reset()
-    _run(f)
-    while (_duration < _bench_time) and (_n < _max_ops) do
-      _n = if _ns_per_op() == 0 then
+  new create(
+    notify: _BenchNotify,
+    name: String,
+    f: ({(): A ?} val | {(): Promise[A] ?} val),
+    bench_time: U64 = 1_000_000_000,
+    max_ops: U64 = 1_000_000
+  ) =>
+    _notify = notify
+    _run = recover
+      lambda(ops: U64)(notify = this, name, f) =>
+        match f
+        | let fn: {(): A ?} val => _Bench[A](notify)(name, fn, ops)
+        | let fn: {(): Promise[A] ?} val => None // TODO _BenchAsync
+        end
+      end
+    end
+    _auto_ops = _AutoOps(bench_time, max_ops)
+
+  be apply(ops: U64 = 0) => _run(ops)
+
+  be _result(name: String, ops: U64, nspo: U64) =>
+    match _auto_ops(ops, ops*nspo, nspo)
+    | let ops': U64 => apply(ops')
+    else _notify._result(name, ops, nspo)
+    end
+
+  be _failure(name: String) => _notify._failure(name)
+
+class _AutoOps
+  let _bench_time: U64
+  let _max_ops: U64
+
+  new create(bench_time: U64, max_ops: U64) =>
+    (_bench_time, _max_ops) = (bench_time, max_ops)
+
+  fun apply(ops: U64, time: U64, nspo: U64): (U64 | None) =>
+    if (time < _bench_time) and (ops < _max_ops) then
+      var ops' = if nspo == 0 then
         _max_ops
       else
-        _bench_time / _ns_per_op()
+        _bench_time / nspo
       end
-      _n = _max(_min(_n + (_n / 5), _prev_n * 100), _prev_n + 1)
-      _n = _round_up(_n)
-      _run(f)
-    end
-    (_n, _ns_per_op())
-
-  fun ref _start_timer() =>
-    if not _timing then
-      _start_time = Time.nanos()
-      _timing = true
-    end
-
-  fun ref _stop_timer() =>
-    if _timing then
-      _duration = _duration + (Time.nanos() - _start_time)
-      _timing = false
-    end
-
-  fun ref _reset_timer() =>
-    if _timing then
-      _start_time = Time.nanos()
-    end
-    _duration = 0
-
-  fun ref _run(f: {(): A ?} val) ? =>
-    @pony_triggergc[None](this)
-    _reset_timer()
-    _start_timer()
-    for i in Range[U64](0, _n) do
-      DoNotOptimise[A](f())
-    end
-    _stop_timer()
-
-    _prev_n = _n
-    _prev_duration = _duration
-
-  fun _ns_per_op(): U64 =>
-    if _n <= 0 then
-      0
+      ops' = _max(_min(ops' + (ops' / 5), ops * 100), ops + 1)
+      _round_up(ops')
     else
-      _duration / _n
+      None
     end
 
   fun _min(x: U64, y: U64): U64 =>
@@ -103,11 +94,3 @@ class _AutoBench[A: Any #share]
     else
       base * 10
     end
-
-  fun ref _reset() =>
-    _n = 1
-    _start_time = 0
-    _duration = 0
-    _timing = false
-    _prev_n = 0
-    _prev_duration = 0
