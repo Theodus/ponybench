@@ -24,7 +24,24 @@ actor PonyBench
     _bs.push((name, bf, ""))
     if _bs.size() < 2 then bf() end
 
-  // TODO async
+  be async[A: Any #share](
+    name: String,
+    f: {(): Promise[A] ?} val,
+    ops: U64 = 0
+  ) =>
+    let bf = recover val
+      if ops == 0 then
+        lambda()(notify = this, name, f) =>
+          _AutoBench[A](notify, name, f)()
+        end
+      else
+        lambda()(notify = this, name, f, ops) =>
+          _BenchAsync[A](notify)(name, f, ops)
+        end
+      end
+    end
+    _bs.push((name, bf, ""))
+    if _bs.size() < 2 then bf() end
 
   be _result(name: String, ops: U64, nspo: U64) =>
     let fmt = FormatSettingsInt.set_width(10)
