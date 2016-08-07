@@ -9,15 +9,14 @@ actor Main
     bench[USize]("fib 40", lambda(): USize => Fib(40) end)
     bench[String]("fail", lambda(): String ? => error end)
 
-    // TODO timeout
     bench.async[USize]("async", object iso
       fun apply(): Promise[USize] =>
         let p = Promise[USize]
         p(0)
     end)
 
-    bench[USize]("add", lambda(): USize => 1 + 2 end, 1_000_000)
-    bench[USize]("sub", lambda(): USize => 2 - 1 end, 1_000_000)
+    bench[USize]("add", lambda(): USize => 1 + 2 end, 10_000_000)
+    bench[USize]("sub", lambda(): USize => 2 - 1 end, 10_000_000)
 
 primitive Fib
   fun apply(n: USize): USize =>

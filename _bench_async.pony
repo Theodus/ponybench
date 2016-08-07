@@ -25,7 +25,7 @@ actor _BenchAsync[A: Any #share]
       _notify._failure(name)
     end
 
-actor _PromiseNotify // TODO timeout
+actor _PromiseNotify
   let _notify: _BenchNotify
   let _name: String
   let _ops: U64
