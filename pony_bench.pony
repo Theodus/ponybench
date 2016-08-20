@@ -1,6 +1,7 @@
 use "collections"
 use "promises"
 use "term"
+use "time"
 
 actor PonyBench
   embed _bs: Array[(String, {()} val, String)]
@@ -27,8 +28,37 @@ actor PonyBench
   be async[A: Any #share](
     name: String,
     f: {(): Promise[A] ?} val,
+    timeout: U64 = 0,
     ops: U64 = 0
   ) =>
+    if timeout > 0 then
+      let t = Timer(object iso is TimerNotify
+        let _bench: PonyBench = this
+        let _name: String = name
+        let _f: {(): Promise[A] ?} val = f
+        let _ops: U64 = ops
+        fun ref apply(timer: Timer ref, count: U64): Bool =>
+          _bench._failure(_name)
+          false
+        fun ref cancel(timer: Timer ref) =>
+          _bench.async[A](_name, _f, 0, _ops)
+      end, timeout)
+      let ts = Timers
+      let tt: Timer tag = t
+      ts(consume t)
+      try
+        let p = f()
+        p.next[A](recover
+          lambda(a: A)(ts, tt): A =>
+            ts.cancel(tt)
+            a
+          end
+        end)
+      else
+        _failure(name)
+      end
+    end
+
     let bf = recover val
       if ops == 0 then
         lambda()(notify = this, name, f) =>
