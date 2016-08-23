@@ -9,16 +9,14 @@ actor Main
     bench[USize]("fib 40", lambda(): USize => Fib(40) end)
     bench[String]("fail", lambda(): String ? => error end)
 
-    bench.async[USize]("async", object iso
-      fun apply(): Promise[USize] =>
-        let p = Promise[USize]
-        p(0)
+    bench.async[USize]("async", lambda(): Promise[USize] =>
+      let p = Promise[USize]
+      p(0)
     end)
 
-    bench.async[USize]("timeout", object iso
-      fun apply(): Promise[USize] =>
-        let p = Promise[USize]
-        if false then p(0) else p end
+    bench.async[USize]("timeout", lambda(): Promise[USize] =>
+      let p = Promise[USize]
+      if false then p(0) else p end
     end, 1_000_000)
 
     bench[USize]("add", lambda(): USize => 1 + 2 end, 10_000_000)
