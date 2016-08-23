@@ -15,8 +15,7 @@ actor Main
     end)
 
     bench.async[USize]("timeout", lambda(): Promise[USize] =>
-      let p = Promise[USize]
-      if false then p(0) else p end
+      Promise[USize]
     end, 1_000_000)
 
     bench[USize]("add", lambda(): USize => 1 + 2 end, 10_000_000)
